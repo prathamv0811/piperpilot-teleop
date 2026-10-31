@@ -46,7 +46,7 @@ def build_stack(args):
 
     arm = make_arm(cfg)
     home = cfg.arm.get("home_joints")
-    if home:
+    if home and cfg.arm.get('auto_home', True):
         print(f"[arm] moving to home joints {home}")
         arm.move_joints(home)
     quest = None

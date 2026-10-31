@@ -1,0 +1,4 @@
+interface:
+  display_name: "PiPER Camera Window"
+  short_description: "Start and recover the local UVC camera viewer"
+  default_prompt: "Use $piper-camera to prepare and verify the requested PiPER workflow."

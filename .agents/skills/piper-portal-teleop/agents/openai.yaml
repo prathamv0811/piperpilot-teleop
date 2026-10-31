@@ -1,0 +1,4 @@
+interface:
+  display_name: "PiPER Portal Teleop"
+  short_description: "Operate the optional Portal robot/operator bridge"
+  default_prompt: "Use $piper-portal-teleop to prepare and verify the requested PiPER workflow."

@@ -66,6 +66,7 @@ arm:
                          #             contact (bounded-force safety)
                          # piper     = move_p position control (firmware IK,
                          #             tightest tracking; CLI: --position)
+                         # piper_joint = host IK, bounded move_j position targets
                          # fake      = full pipeline without hardware
   model: PIPER_X         # pyAgxArm ArmModel enum name (PIPER / PIPER_X / ...)
   firmware: V189         # pyAgxArm PiperFW enum name — MUST match robot.get_firmware()
@@ -76,6 +77,17 @@ arm:
   speed_percent: 100
   enable_soft_joint_limits: true
   home_joints: null      # e.g. [0.0, 0.8, -0.6, 0.0, 0.6, 0.0]; null = don't auto-home
+  auto_home: true        # false keeps explicit homing available but skips startup motion
+
+joint_position:          # piper_joint backend: host IK + firmware move_j
+  joint_margin_deg: 3.0
+  max_joint_vel: 0.4     # rad/s; enforced per joint before sending a target
+  max_joint_deviation: 0.08  # rad; command may not run far ahead of feedback
+  feedback_timeout_s: 0.25
+  damping: 0.015
+  iters: 12
+  pos_tol: 0.001
+  rot_tol: 0.01
 
 impedance:               # piper_mit backend only. T = kp*(q_des-q) - kd*v + t_ff
   kp: [5, 25, 5, 8, 8, 5]      # N*m/rad — near SDK reference (10); tune on-robot:

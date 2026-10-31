@@ -1,229 +1,147 @@
-<p align="center">
-  <img src="docs/assets/hero.svg" alt="PiperPilot: Quest and SpaceMouse teleoperation for Piper-X" width="100%">
-</p>
+# PiperPilot Teleop
 
-<h1 align="center">PiperPilot</h1>
+Native PiPER leader–follower operation, dual-arm Quest teleoperation, single-arm
+Quest/SpaceMouse control, and local UVC camera viewing. Includes the Quest
+OpenXR app, host controllers, data collection/replay tools, optional Portal
+integration, and repository-local skills for coding agents.
 
-<p align="center">
-  <strong>Low-latency Quest 3 and SpaceMouse teleoperation, LeRobot data
-  collection, replay, and policy deployment for Piper-X.</strong>
-</p>
+Derived from [tomakeIT/PiperPilot](https://github.com/tomakeIT/PiperPilot).
+The upstream MIT license and Git history are retained. Robot SDKs remain
+external dependencies rather than copied binaries.
 
-<p align="center">
-  <a href="https://github.com/tomakeIT/PiperPilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tomakeIT/PiperPilot/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Python 3.10–3.11" src="https://img.shields.io/badge/Python-3.10%E2%80%933.11-3776AB?logo=python&logoColor=white">
-  <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-22c55e">
-  <img alt="Platform Linux" src="https://img.shields.io/badge/Platform-Linux-f59e0b?logo=linux&logoColor=white">
-  <img alt="Status Alpha" src="https://img.shields.io/badge/Status-Alpha-8b5cf6">
-</p>
+## Choose an operating mode
 
-Teleoperate an AgileX Piper / Piper-X (6 DOF + gripper) with a Meta Quest 3
-controller or a 3Dconnexion SpaceMouse, record demonstrations directly as
-**LeRobot v2.0 datasets** (with GR00T-style modality metadata), and close the
-loop with episode replay and a policy-inference runtime.
+| Mode | Connection | Start here |
+| --- | --- | --- |
+| Native left leader → right follower, including gripper | Arms share one CAN bus; one USB-CAN adapter for inspection | [Native setup](NATIVE_LEADER_FOLLOWER.md) |
+| Dual Quest teleop | One separate USB-CAN bus per arm; Quest over USB/ADB | [Local commands](LOCAL_TELEOP_COMMANDS.md) |
+| Single-arm Quest or SpaceMouse | One arm connected to the host | [Setup](SETUP_LOCAL.md) |
+| Top UVC camera window | Local Rerun viewer; independent of arm control | [Camera commands](LOCAL_TELEOP_COMMANDS.md#top-camera-and-rerun) |
+| Optional Portal teleop | Explicitly selected local/private-network SFU | [Portal integration](integrations/portal/README.md) |
 
-> [!CAUTION]
-> This is experimental robotics software, not a safety-rated control system.
-> Software clamps and watchdogs reduce risk but are not certified force or
-> motion limits. Keep the manufacturer's emergency stop accessible, clear the
-> workspace, verify configuration in simulation, and supervise every real-arm
-> run.
+Native following runs in the arms. It is not a PC forwarding loop and does not
+need Quest or an SFU. Its high-follow mode does **not** obey the saved position
+control speed percentage. Do not run a PC motion controller while the native
+leader is connected to the follower.
 
-📖 **[Full documentation](https://jialengni.com/PiperPilot/)**
-(MkDocs + Material, from a zero-hardware
-quick start to wire protocols). Every push to `main` automatically builds and
-publishes the documentation with GitHub Pages.
+## Install
 
-## Features
-
-- 🥽 **Native Quest 3 app** (C++ / OpenXR, no Unity): 90 Hz dual-controller
-  poses over a wired USB link (`adb forward`), color passthrough, up to three
-  floating camera panels plus a recording HUD inside the headset, haptic
-  feedback;
-- 🖱️ **SpaceMouse rate control**: direct HID read (no spacenavd), switchable
-  with one flag;
-- 🫳 **Two control modes**: MIT impedance control (default — compliant on
-  contact, bounded force, host-side DLS-IK + torque-snapshot gravity
-  feed-forward) / firmware position control (1.3 mm RMS tracking);
-- 📦 **Direct LeRobot v2.0 writing**: parquet + mp4 (PTS timestamp-aligned) +
-  full metadata, including a per-session provenance record of the controller,
-  firmware, and gains, with a change guard on binding-critical parameters;
-- 🖥️ **Web dashboard while collecting**: recording state, episode timer,
-  saved count, and live camera thumbnails at `http://127.0.0.1:8780` —
-  read-only, zero extra dependencies;
-- 🔁 **Replay & inference runtime**: open-loop episode replay (with a
-  reproduction-error report), an observation→policy→action-chunk execution
-  loop, and a framework-agnostic HTTP policy-server protocol;
-- 🛡️ **Safety envelope**: workspace box, velocity/step clamps,
-  target-to-measured deviation tethering (caps contact force), stream
-  watchdogs, fault-triggered stops, and automatic position-hold handback on
-  exit;
-- ✅ 61 unit/integration tests; the full chain verified on real hardware.
-
-## Architecture
-
-![PiperPilot system overview](docs/assets/system-overview.svg)
-
-## Hardware requirements
-
-| Component | Notes |
-|---|---|
-| AgileX Piper / Piper-X | 6 DOF + AgxGripper, USB-CAN (gs_usb/candleLight) @ 1 Mbps |
-| Meta Quest 3 *(optional)* | Developer mode + USB data cable; or use a SpaceMouse |
-| 3Dconnexion SpaceMouse *(optional)* | Compact/Wireless etc., USB |
-| Intel RealSense *(optional)* | e.g. D435i, 1–3 cameras for visual observations |
-| Host | Linux (Ubuntu 22.04 verified), conda; building the APK needs a ~2.5 GB Android toolchain |
-
-## Command cheat sheet
-
-Install (fresh machine, in order):
-
-| Command | Purpose |
-|---|---|
-| `make toolchain` | Android SDK/NDK/JDK17/Gradle (only needed to build the APK) |
-| `make env` | conda env `piper_teleop` + deps + pyAgxArm |
-| `make can` | can0 @ 1 Mbps (sudo) |
-| `make apk` | build the Quest APK |
-| `bash install/05_quest_udev.sh` | Quest USB debugging permissions (sudo, one-time) |
-| `make spacemouse` | SpaceMouse udev rules + read test (sudo, one-time) |
-
-Daily:
-
-| Command | Purpose |
-|---|---|
-| `make connect` | after plugging in the Quest: install/start APK + `adb forward` + proximity sensor off |
-| `make home` | after every arm power-on: unfold from the folded pose to the working pose |
-| `make view` | rerun visualization of controller poses |
-| `make collect TASK="..."` | THE app: teleop + recording — recording starts only when you press A/space, nothing is saved until you do. Uses `default.yaml`; add an overlay with `CONFIG=first_run.yaml`; variants: `collect-sm` (SpaceMouse) / `collect-sim` (no hardware) |
-| `piper-replay --root <ds>` | replay a recorded episode + reproduction-error report |
-| `piper-infer --policy <spec>` | policy-inference execution loop |
-| `piper-track-test [--position]` | tracking-error benchmark |
-| `piper-finalize --root <ds>` | generate relative/delta stats |
-| `make test` | unit tests |
-
-After `make env`, activate the environment with
-`conda activate piper_teleop`. For a standard editable install without the
-bootstrap script, use `python -m pip install -e ".[full]"`; real-arm control
-still requires the separate pyAgxArm SDK described in the installation guide.
-
-For the first real-arm session add the conservative overlay:
-`make collect CONFIG=first_run.yaml` (50% speed, 0.6 position scale).
-
-## Control modes
-
-| | `piper_mit` (default) | `piper` (`--position`) |
-|---|---|---|
-| Principle | host DLS-IK → per-joint MIT impedance (T = kp·Δq − kd·v + t_ff) + torque-snapshot gravity feed-forward | streamed `move_p` poses, IK in firmware |
-| Contact behavior | **compliant**; contact force capped ≈ kp × deviation clamp (~20 N default) | rigid (position servo) |
-| Measured tracking | ~14 mm RMS / 90 ms (soft gains; higher kp = tighter) | **1.3 mm RMS / 10 ms** |
-| Best for | day-to-day collection, contact tasks, safe RL exploration | high-precision free-space tasks |
-
-Impedance mode ships with: torque-continuous mode handover (gain soft-start +
-unramped gravity snapshot), automatic intersection with the SDK per-model
-joint limits, hold-on-IK-divergence, and position-hold handback on exit.
-Tuning: droops under gravity → raise kp; hums / hard to push → lower kp, kd.
-
-## Controls
-
-**Quest** (default right hand, configurable via `quest.control_hand`):
-
-| Input | Function |
-|---|---|
-| hold **grip** | clutch engage: controller deltas map 1:1 to the EEF (release freezes; re-grip to ratchet) |
-| **trigger** (analog) | gripper open/close (continuous) |
-| **A / X** | start / stop-and-save episode (haptic confirm, view tints red) |
-| **B / Y** | discard current episode |
-| non-control hand **Y/B** held 1 s | home to the working pose |
-| non-control hand **X/A** held 1 s | discard current episode, or delete the last episode saved this session |
-| left **menu** | force clutch release |
-| long-press **Meta** | re-place the floating panels in front of you |
-
-**SpaceMouse**: puck = EEF velocity (stops on release); left button = gripper
-toggle; right button short press = start/stop recording, hold 1 s = home;
-both buttons = discard. Flip axes that feel backwards via
-`spacemouse.axis_signs`.
-
-## Dataset format (LeRobot v2.0)
-
-```
-<root>/
-├── meta/{info.json, modality.json, episodes.jsonl, tasks.jsonl, stats.json,
-│         collection_meta.json, collection_sessions.jsonl}   # provenance
-├── data/chunk-000/episode_000000.parquet     # 30 Hz
-├── videos/chunk-000/observation.images.<cam>/episode_000000.mp4  # 30 fps
-└── extras/                                   # raw input streams (debug)
-```
-
-| parquet column | dim | contents |
-|---|---|---|
-| `observation.arm_joint` | 6 | measured joint angles (rad) |
-| `observation.arm_eef` | 7 | measured flange pose: pos (3) + **quat wxyz** (4), base frame |
-| `observation.gripper` | 1 | measured gripper width (m) |
-| `action.arm_eef` | 7 | **absolute** EEF target |
-| `action.gripper` | 1 | target gripper width (m) |
-
-Conventions: meters/radians, absolute actions, video PTS shares the parquet
-`timestamp` clock (timestamp-based alignment, naturally tolerant of rate
-mismatch). Trainer-side, set `action_frequency=30` and downsample with stride
-3 for a 10 Hz decision rate. Session provenance goes to
-`collection_meta.json` (controller, firmware, gains, camera serials, …);
-changing binding-critical parameters between sessions triggers a prominent
-warning — **a policy is bound to the controller parameters it was trained
-under**.
-
-## Replay & inference
+Linux, Python 3.10–3.11 (3.11 recommended), and a 1 Mbit/s CAN interface are
+required for the hardware workflows. From this repository:
 
 ```bash
-piper-replay --root <ds> [--episode 0] [--speed 0.7] [--position]
-piper-infer --policy replay:<ds>:0            # closed-loop self-test
-piper-infer --policy http://gpu-host:8901     # remote model server
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[full,test]'
+python -m pip install 'pyagxarm @ git+https://github.com/agilexrobotics/pyAgxArm.git@d90e234ba8e408cfa964b38aa9120b3131fc9f85'
+cp -n dual.example.yaml dual.local.yaml
+cp -n left.example.yaml left.local.yaml
+./piperpilot dual-inventory
 ```
 
-Inference loop: every 0.5 s rebuild the observation (latest camera frames +
-joints/EEF/gripper) → `predict()` returns a 30-step absolute action chunk →
-execute at 30 Hz, under the same safety envelope as teleoperation. The HTTP
-protocol (`POST /predict`, JSON + base64 JPEG → `(H, 8)` action chunk) is
-documented in `piper_teleop/policy.py`; a reference server ships as
-`python -m piper_teleop.tools.example_policy_server`.
+Edit the local configuration for your actual arm model, firmware, adapter
+serials, home pose and workspace. Confirm left/right identity physically before
+setting `dual.mapping_confirmed: true`. The examples target **standard PiPER,
+firmware S-V1.8-3 through S-V1.8-7 (`V183`)**. The upstream generic defaults
+still target Piper-X; always use the appropriate overlay for standard PiPER.
+Do not copy another bench's encoder calibration or wrist offset.
 
-## Measured benchmarks (Piper-X, firmware S-V1.8-9)
+The launcher prefers `PIPERPILOT_PYTHON`, an activated virtual environment,
+`.venv`, or an existing `piper_teleop` conda environment. Android paths follow
+`ANDROID_HOME` and `JAVA_HOME`; no `/home/dev` paths are required.
 
-| Metric | Position mode | Impedance mode (soft gains) |
-|---|---|---|
-| Static hold error | ≈0 mm | 11 mm |
-| Dynamic RMS (3 cm circle, 5 s/lap) | 1.34 mm | 14.1 mm |
-| Estimated latency | ~10 ms | ~90 ms |
+If a reconnected adapter is down, activate the actual interface reported by
+inventory, for example:
 
-Measured Quest pose link: 90–92 Hz; the video panels never affect the pose
-stream (separate port + drop-frames-never-queue).
+```bash
+sudo ip link set can0 up type can bitrate 1000000
+```
 
-## Troubleshooting
+This requires local administrator authentication. A detected USB device is not
+proof that the CAN interface is up or that either arm is healthy.
 
-| Symptom | Fix |
-|---|---|
-| `adb devices` empty / `unauthorized` | `install/05_quest_udev.sh`; allow USB debugging in the headset |
-| APK runs but no data | `make connect` (wake + proximity off); `adb logcat -s QuestTeleop` |
-| Controllers valid but tracked=false | aim the headset at the operating area (controllers are camera-tracked) |
-| `enable arm` timeout | arm powered? `ip -details link show can0` must show 1 Mbps |
-| `TARGET_POS_EXCEEDS_LIMIT(4)` | arm is in the folded pose: run `make home` first |
-| Humming in impedance mode | lower `impedance.kp/kd` (see Control modes) |
-| SpaceMouse won't open | `make spacemouse` for udev rules, replug; stop spacenavd |
-| pytest errors from external plugins | use `make test` (isolated PYTHONPATH and plugins) |
+## Native leader–follower
 
-See the [full documentation](docs/) for detailed, symptom-first
-troubleshooting.
+While the arms are on **separate** CAN buses, check health and assign roles:
 
-## Acknowledgements & dependencies
+```bash
+./piperpilot leader-follower-check
+./piperpilot leader-follower-configure --separate-buses --workspace-clear
+```
 
-[pyAgxArm](https://github.com/agilexrobotics/pyAgxArm) (official AgileX SDK,
-LGPL-3.0) · [LeRobot](https://github.com/huggingface/lerobot) dataset format ·
-[rerun](https://rerun.io) · [stb_image](https://github.com/nothings/stb)
-(public domain, vendored) · Khronos OpenXR loader.
+The two flags confirm physical facts. Role configuration uses a broadcast
+message; never send opposite role settings with both arms sharing one bus.
+After powering off and wiring as shown in the [official AgileX guide](https://github.com/agilexrobotics/piper_sdk/blob/master/assets/double_piper.MD),
+power the right follower first and the left leader second. Then inspect:
 
-## License
+```bash
+./piperpilot leader-follower-check --shared
+```
 
-[MIT](LICENSE). Note that pyAgxArm is an LGPL-3.0 runtime dependency
-(installed via pip; not vendored).
+Verify a small, supervised manual leader movement and matching follower joint
+and gripper feedback. Sent role commands and a stationary matching pose do not
+prove successful following. The helper reports evidence without declaring
+unobserved motion verified. `dual-stop` stops a PC session, not native firmware
+following. See the [full procedure](NATIVE_LEADER_FOLLOWER.md).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and
-[SECURITY.md](SECURITY.md) for responsible vulnerability reporting.
+## Local Quest / SpaceMouse
+
+For two arms on separate buses:
+
+```bash
+./piperpilot connect
+./piperpilot dual-check --arm-only
+./piperpilot dual-check
+./piperpilot dual-home
+./piperpilot dual-teleop
+```
+
+Homing moves hardware. Verify the workspace and configured home targets first.
+Release both controllers' grips and triggers before engaging. Hold a grip to
+move its arm; triggers control the matching grippers. `Ctrl+C` or
+`./piperpilot dual-stop` ends the PC session.
+
+For one arm with `left.local.yaml` configured:
+
+```bash
+./piperpilot check
+./piperpilot home
+./piperpilot teleop
+# Alternative input, using the same explicit arm configuration:
+python -m piper_teleop.apps.collect_data --config left.local.yaml --input spacemouse
+```
+
+Build/install the Quest app with the existing `install/` scripts and
+`./piperpilot build-apk`. Details: [setup](SETUP_LOCAL.md),
+[Quest](docs/guide/quest.md), [SpaceMouse](docs/guide/spacemouse.md).
+
+## Agent skills
+
+Read [AGENTS.md](AGENTS.md). Skills are included in `.agents/skills/` and can be
+invoked by name in an agent that supports repository skills, or read directly:
+
+- `$piper-leader-follower`: configure and verify the native left/right pair.
+- `$piper-local-teleop`: dual Quest, single Quest, or SpaceMouse operation.
+- `$piper-camera`: restore UVC capture and open the local camera window.
+- `$piper-portal-teleop`: optional Portal robot/operator workflow.
+
+Example: “Use $piper-leader-follower to start the left leader and right follower,
+including the gripper, then use $piper-camera to open the top camera.”
+
+Skills inspect current processes, wiring, feedback and configuration; they do
+not assume a past report still describes the connected hardware.
+
+## Validation and source contents
+
+```bash
+./piperpilot test
+python -m pip install -e '.[docs]'
+python -m mkdocs build --strict
+```
+
+CI runs hardware-free tests with the pinned SDK and builds the documentation.
+Tests do not establish that a physical pair is aligned or following correctly.
+Reports, datasets, camera recordings, `.env` credentials, local YAML settings,
+virtual environments, SDK checkouts and built APKs are intentionally excluded
+from Git. All application source and build instructions are included. GitHub
+Pages deployment is manual and requires separately configuring Pages.

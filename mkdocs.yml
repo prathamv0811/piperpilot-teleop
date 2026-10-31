@@ -2,8 +2,8 @@ site_name: PiperPilot
 site_description: >-
   VR & SpaceMouse teleoperation, impedance control, and LeRobot-format data
   collection for the AgileX Piper arm.
-site_url: !ENV [SITE_URL, "https://jialengni.com/PiperPilot/"]
-repo_url: !ENV [REPO_URL, "https://github.com/tomakeIT/PiperPilot"]
+site_url: !ENV [SITE_URL, "https://prathamv0811.github.io/piperpilot-teleop/"]
+repo_url: !ENV [REPO_URL, "https://github.com/prathamv0811/piperpilot-teleop"]
 repo_name: PiperPilot
 
 theme:

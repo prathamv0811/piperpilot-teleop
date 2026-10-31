@@ -59,6 +59,7 @@ class TeleopController:
         self.arm = arm
         self.cfg = cfg
         self.hand = cfg.quest.control_hand
+        self.other_hand_gestures = bool(cfg.quest.get("other_hand_gestures", True))
         t = cfg.teleop
         self.rate_hz = float(t.rate_hz)
         self.pos_scale = float(t.pos_scale)
@@ -183,8 +184,9 @@ class TeleopController:
         hand = qs.hand(self.hand)
         st.tracked = hand.tracked
         self._emit_button_events(qs)
-        self._detect_home_gesture(qs)
-        self._detect_delete_gesture(qs)
+        if self.other_hand_gestures:
+            self._detect_home_gesture(qs)
+            self._detect_delete_gesture(qs)
 
         # Gripper always live while the hand is tracked (independent of clutch).
         if hand.valid:

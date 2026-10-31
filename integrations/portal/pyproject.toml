@@ -1,0 +1,22 @@
+[project]
+name = "livekit-portal-piperpilot-dual"
+version = "0.1.0"
+description = "Optional PiPER Robot and Quest Operator for LiveKit Portal"
+requires-python = ">=3.11"
+dependencies = ["livekit-portal", "livekit-api>=0.7", "python-dotenv>=1", "piperpilot"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.23"]
+hardware = ["pyagxarm==1.0.0", "python-can>=3.3.4"]
+visualization = ["rerun-sdk==0.35.0"]
+
+[tool.uv.sources]
+livekit-portal = { path = "../../vendor/portal/python/packages/livekit-portal", editable = true }
+piperpilot = { path = "../..", editable = true }
+pyagxarm = { git = "https://github.com/agilexrobotics/pyAgxArm.git", rev = "d90e234ba8e408cfa964b38aa9120b3131fc9f85" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]

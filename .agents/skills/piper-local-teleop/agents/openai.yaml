@@ -1,0 +1,4 @@
+interface:
+  display_name: "PiPER Local Teleop"
+  short_description: "Start dual Quest or single Quest/SpaceMouse control"
+  default_prompt: "Use $piper-local-teleop to prepare and verify the requested PiPER workflow."

@@ -1,0 +1,36 @@
+dual:
+  mapping_confirmed: false
+  arms:
+    left:
+      usb_serial: REPLACE_LEFT_ADAPTER_SERIAL
+      firmware: V183
+      speed_percent: 50
+      home_speed_percent: 50
+    right:
+      usb_serial: REPLACE_RIGHT_ADAPTER_SERIAL
+      firmware: V183
+      speed_percent: 50
+      home_speed_percent: 50
+arm:
+  backend: piper_joint
+  model: PIPER
+  firmware: V183
+  speed_percent: 50
+  home_joints: [0.0, 1.1, -1.2, 0.0, 0.5, 0.0]
+  auto_home: false
+quest:
+  other_hand_gestures: false
+  stale_timeout_s: 0.25
+teleop:
+  pos_scale: 1.0
+  limits:
+    max_lin_vel: 0.08
+    max_ang_vel: 0.5
+    max_cmd_deviation: 0.03
+joint_position:
+  max_joint_vel: 0.4
+gripper:
+  max_width: 0.07
+  force: 2.0
+  rate_hz: 30
+cameras: []

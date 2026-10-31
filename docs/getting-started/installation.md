@@ -25,7 +25,7 @@ not needed for anything else.
 - Git, to clone this repository and the pyAgxArm SDK.
 
 ```bash
-git clone https://github.com/tomakeIT/PiperPilot.git
+git clone https://github.com/prathamv0811/piperpilot-teleop.git
 cd PiperPilot
 ```
 

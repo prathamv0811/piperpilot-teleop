@@ -1,0 +1,4 @@
+interface:
+  display_name: "PiPER Leader–Follower"
+  short_description: "Configure and verify native PiPER arm following"
+  default_prompt: "Use $piper-leader-follower to prepare and verify the requested PiPER workflow."

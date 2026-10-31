@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Portable launcher; prefer an explicit interpreter or an existing project env.
+set -euo pipefail
+cd "$(dirname "$(realpath "$0")")"
+if [[ -n "${PIPERPILOT_PYTHON:-}" ]]; then
+  PYTHON_BIN="$PIPERPILOT_PYTHON"
+elif [[ -n "${VIRTUAL_ENV:-}" && -x "$VIRTUAL_ENV/bin/python" ]]; then
+  PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+elif [[ -x .venv/bin/python ]]; then
+  PYTHON_BIN="$PWD/.venv/bin/python"
+elif [[ -x "$HOME/miniconda3/envs/piper_teleop/bin/python" ]]; then
+  PYTHON_BIN="$HOME/miniconda3/envs/piper_teleop/bin/python"
+elif [[ -x "$HOME/miniforge3/envs/piper_teleop/bin/python" ]]; then
+  PYTHON_BIN="$HOME/miniforge3/envs/piper_teleop/bin/python"
+else
+  PYTHON_BIN="$(command -v python3)"
+fi
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
+export PATH="$(dirname "$PYTHON_BIN"):$ANDROID_HOME/platform-tools:$PATH"
+export PYTHONPATH="$PWD"
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  for jdk_dir in "$HOME/miniconda3/envs/jdk17" "$HOME/miniforge3/envs/jdk17"; do
+    if [[ -x "$jdk_dir/bin/java" ]]; then export JAVA_HOME="$jdk_dir"; break; fi
+  done
+fi
+mode=${1:-help}
+if (( $# > 0 )); then shift; fi
+case "$mode" in
+  leader-follower-check|leader-follower-configure)
+    exec "$PYTHON_BIN" -m local_setup.leader_follower "${mode#leader-follower-}" "$@" ;;
+  dual-inventory|dual-check|dual-home|dual-preview|dual-teleop|dual-stop)
+    exec "$PYTHON_BIN" -m local_setup.dual "${mode#dual-}" "$@" ;;
+  connect) exec bash scripts/quest_connect.sh -p "$@" ;;
+  camera) exec "$PYTHON_BIN" -m local_setup.camera_stream "$@" ;;
+  check) exec "$PYTHON_BIN" local_setup/check.py "$@" ;;
+  stop)
+    "$PYTHON_BIN" -m local_setup.dual stop
+    exec "$PYTHON_BIN" local_setup/stop.py ;;
+  view) exec "$PYTHON_BIN" -m piper_teleop.apps.view_poses --config left.local.yaml "$@" ;;
+  sim|preview)
+    exec "$PYTHON_BIN" -m piper_teleop.apps.collect_data --config left.local.yaml --sim --task "PiperPilot setup preview" "$@" ;;
+  teleop)
+    "$PYTHON_BIN" local_setup/check.py --require-ready
+    exec "$PYTHON_BIN" -m piper_teleop.apps.collect_data --config left.local.yaml "$@" ;;
+  home)
+    "$PYTHON_BIN" local_setup/check.py --arm-only --for-home
+    exec "$PYTHON_BIN" -m piper_teleop.apps.home_arm --config left.local.yaml --speed 10 "$@" ;;
+  test) exec make test PY="$PYTHON_BIN" "$@" ;;
+  camera-viewer) exec "$(dirname "$PYTHON_BIN")/rerun" --serve-web --bind 127.0.0.1 --port 9876 --web-viewer-port 9090 --server-memory-limit 128MiB --threads 4 "$@" ;;
+  build-apk) exec bash quest_app/build.sh "$@" ;;
+  *)
+    cat <<'HELP'
+Dual-arm commands (dual.local.yaml, adapter serials pinned):
+  piperpilot leader-follower-check       read native CAN traffic and arm health
+  piperpilot leader-follower-check --shared   inspect both native arms on one adapter
+  piperpilot leader-follower-configure   assign LEFT leader / RIGHT follower; see --help
+  piperpilot dual-inventory   show connected CAN adapters and USB serials
+  piperpilot dual-check       read both arms and both Quest controllers
+  piperpilot dual-preview     both Quest controllers with simulated arms
+  piperpilot dual-home        MOVE both arms sequentially at configured home speeds
+  piperpilot dual-teleop      control both arms from one Quest connection
+  piperpilot dual-stop        stop the dual session
+  piperpilot camera --camera PATH   stream top UVC to Quest and local Rerun
+  piperpilot camera-viewer     serve the local Rerun camera window on port 9090
+
+PiperPilot configured for the standard LEFT PiPER + LEFT Quest 3S controller.
+  piperpilot connect       start the headset app and USB forwarding
+  piperpilot check         read-only robot feedback + Quest tracking check
+  piperpilot view          visualize Quest poses; no robot control
+  piperpilot preview       live Quest input with a FAKE arm; c calibrates axes
+  piperpilot home          MOVE the real arm to its unfolded pose at 10% speed
+  piperpilot teleop        enable real-arm teleoperation at the configured speed
+  piperpilot stop          quit the active PiperPilot controller process
+  piperpilot test          run upstream tests
+  piperpilot build-apk     rebuild the native headset app
+
+Real teleop: hold LEFT grip to move, trigger controls gripper;
+X toggles recording, Y discards; q quits. See SETUP_LOCAL.md.
+HELP
+    ;;
+esac

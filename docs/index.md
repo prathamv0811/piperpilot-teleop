@@ -1,5 +1,10 @@
 # PiperPilot
 
+This repository also includes native left-leader/right-follower CAN setup,
+dual Quest control, and agent skills. Start with the
+[repository README](https://github.com/prathamv0811/piperpilot-teleop) for these
+workflows; the chapters below retain the original application documentation.
+
 ![PiperPilot](assets/hero.svg)
 
 **Teleoperate an AgileX Piper robot arm with a Meta Quest 3 (or a SpaceMouse), and
@@ -35,7 +40,7 @@ runs it back on the robot.
     ---
 
     An MIT-mode impedance controller makes the arm behave like a spring:
-    contact forces are bounded, so it's safe around objects and people.
+    controller gains and target limits bound commanded behavior; supervise hardware operation.
     A stiff position mode is one flag away when you need millimetre tracking.
 
 - :material-database: **LeRobot v2.0 datasets**
@@ -69,7 +74,7 @@ simulation:
 
 ```bash
 git clone https://github.com/agilexrobotics/pyAgxArm ~/pyAgxArm   # arm SDK
-git clone https://github.com/tomakeIT/PiperPilot.git && cd PiperPilot
+git clone https://github.com/prathamv0811/piperpilot-teleop.git && cd piperpilot-teleop
 make env          # one-time: conda env + dependencies
 make collect-sim  # fake arm + fake cameras + keyboard controls
 ```

@@ -95,6 +95,30 @@ class PiperArm(ArmBase):
     """Real arm through pyAgxArm (CAN)."""
 
     def __init__(self, cfg):
+        import fcntl
+        import os
+        import re
+        from pathlib import Path
+
+        channel = re.sub(r'[^a-zA-Z0-9_-]', '_', cfg.arm.channel)
+        lock = (Path('/tmp') / f'piperpilot-{os.getuid()}-{channel}.lock').open('a')
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock.close()
+            raise RuntimeError(f'Another PiperPilot process controls {cfg.arm.channel}; quit it first') from None
+        self._control_lock = lock
+        lock.seek(0)
+        lock.truncate()
+        lock.write(str(os.getpid()) + '\n')
+        lock.flush()
+        try:
+            self._connect(cfg)
+        except BaseException:
+            PiperArm.stop(self)
+            raise
+
+    def _connect(self, cfg):
         from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
 
         model = getattr(ArmModel, cfg.arm.model)
@@ -214,9 +238,115 @@ class PiperArm(ArmBase):
             self.robot.disconnect()
         except Exception:
             pass
+        lock = getattr(self, '_control_lock', None)
+        if lock is not None:
+            lock.close()
+            self._control_lock = None
 
     def emergency_stop(self) -> None:
         self.robot.electronic_emergency_stop()
+
+
+class PiperArmJoint(PiperArm):
+    """Host IK with model-specific limits and firmware joint-position control.
+
+    Unlike firmware Cartesian IK, this path keeps the joint solution near the
+    previous command and checks the standard PiPER's joint limits explicitly.
+    No MIT/torque-control mode is used.
+    """
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        from .ik import MDHIK
+        from .limits import LimitTracker
+
+        opts = cfg.joint_position
+        if self.joint_limits is None:
+            self.stop()
+            raise RuntimeError('SDK joint limits unavailable; refusing joint-position control')
+        margin = math.radians(float(opts.joint_margin_deg))
+        lower, upper = self.joint_limits
+        self.joint_limits = (lower + margin, upper - margin)
+        self._ik = MDHIK(
+            self.robot.fk, *self.joint_limits,
+            damping=float(opts.damping), iters=int(opts.iters),
+            pos_tol=float(opts.pos_tol), rot_tol=float(opts.rot_tol),
+        )
+        self._joint_step = float(opts.max_joint_vel) / float(cfg.teleop.rate_hz)
+        self._joint_lag = float(opts.max_joint_deviation)
+        self._feedback_timeout = float(opts.feedback_timeout_s)
+        self._q_target = None
+        self._target_lock = threading.RLock()
+        self.limits = LimitTracker()
+        self._joint_options = opts.to_dict()
+        print('[piper-joint] host IK + bounded joint-position targets; no torque control')
+
+    def get_state(self):
+        st = super().get_state()
+        msg = self.robot.get_joint_angles()
+        fresh = (msg is not None and msg.hz > 0
+                 and np.shape(msg.msg) == (6,) and np.isfinite(msg.msg).all()
+                 and 0 <= time.time() - msg.timestamp <= self._feedback_timeout)
+        if not fresh:
+            st.joints_valid = st.eef_valid = False
+        elif st.joints_valid:
+            # Use the same FK convention for IK and observed pose so the first
+            # command cannot jump to correct a firmware/model FK discrepancy.
+            st.joints = np.asarray(msg.msg, dtype=float)
+            st.eef_pose6 = np.asarray(self.robot.fk(st.joints.tolist()), dtype=float)
+            st.eef_valid = True
+        return st
+
+    def command_eef(self, pose6):
+        target = np.asarray(pose6, dtype=float)
+        if target.shape != (6,) or not np.isfinite(target).all():
+            raise ValueError('EEF target must contain six finite values')
+        with self._target_lock:
+            st = self.get_state()
+            if not st.joints_valid or st.arm_status != 0:
+                raise RuntimeError('Fresh, fault-free joint feedback is required')
+            lo, hi = self.joint_limits
+            if np.any(st.joints < lo) or np.any(st.joints > hi):
+                raise RuntimeError('Measured joints outside the working limits; home first')
+            previous = st.joints if self._q_target is None else self._q_target
+            solution, converged = self._ik.solve(target, previous)
+            if (not converged or not np.isfinite(solution).all()
+                    or np.any(solution < lo) or np.any(solution > hi)):
+                self.limits.hit('ik', 'unreachable; move controller back')
+                return
+            # Independently verify the solver's result, including rotations
+            # close to 180 degrees where axis extraction can be ambiguous.
+            solved = np.asarray(self.robot.fk(solution.tolist()))
+            dr = xr_math.rpy_to_matrix(*target[3:]) @ xr_math.rpy_to_matrix(*solved[3:]).T
+            angular_error = math.acos(float(np.clip((np.trace(dr) - 1) / 2, -1, 1)))
+            if (np.linalg.norm(solved[:3] - target[:3]) > self._ik.pos_tol
+                    or angular_error > self._ik.rot_tol):
+                self.limits.hit('ik', 'solution residual; move controller back')
+                return
+            delta = solution - previous
+            if np.any(np.abs(delta) > self._joint_step):
+                self.limits.hit('jvel', f'j{np.argmax(np.abs(delta)) + 1}')
+            command = previous + np.clip(delta, -self._joint_step, self._joint_step)
+            if np.any(np.abs(command - st.joints) > self._joint_lag):
+                self.limits.hit('tracking', 'waiting for arm')
+                return
+            self.robot.move_j(command.tolist())
+            self._q_target = command.copy()
+
+    def held_target_pose6(self):
+        with self._target_lock:
+            if self._q_target is None:
+                return None
+            return np.asarray(self.robot.fk(self._q_target.tolist()), dtype=float)
+
+    def move_joints(self, joints):
+        with self._target_lock:
+            self._q_target = None
+            super().move_joints(joints)
+
+    def describe(self):
+        return {**super().describe(), 'joint_position': self._joint_options,
+                'eef_feedback_source': 'SDK FK from measured joints'}
 
 
 class PiperArmMIT(PiperArm):
@@ -525,4 +655,6 @@ def make_arm(cfg) -> ArmBase:
         return FakeArm(cfg)
     if backend == "piper_mit":
         return PiperArmMIT(cfg)
+    if backend == "piper_joint":
+        return PiperArmJoint(cfg)
     return PiperArm(cfg)

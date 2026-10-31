@@ -7,6 +7,7 @@ set -ex
 
 SDK=${ANDROID_HOME:-$HOME/android-sdk}
 CONDA_BIN=${CONDA_BIN:-$HOME/miniforge3/bin/conda}
+JDK_ENV_PATH=${JDK_ENV_PATH:-$("$CONDA_BIN" info --base)/envs/jdk17}
 mkdir -p "$SDK"
 cd "$SDK"
 
@@ -20,10 +21,10 @@ if [ ! -d "$SDK/cmdline-tools/latest" ]; then
 fi
 
 # 2) JDK 17 (sdkmanager and AGP 8 both require it; system java 11 is too old)
-if [ ! -x "$HOME/miniforge3/envs/jdk17/bin/java" ]; then
+if [ ! -x "$JDK_ENV_PATH/bin/java" ]; then
   "$CONDA_BIN" create -y -n jdk17 -c conda-forge 'openjdk=17'
 fi
-export JAVA_HOME="$HOME/miniforge3/envs/jdk17"
+export JAVA_HOME="$JDK_ENV_PATH"
 export PATH="$JAVA_HOME/bin:$PATH"
 java -version
 

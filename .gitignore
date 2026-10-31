@@ -44,3 +44,13 @@ replay_logs/
 # Unrelated local work artifacts (not part of this repository)
 /output/
 /work_evidence/
+
+# Runtime data and optional external source checkouts
+local_setup/reports/
+local_setup/cli-smoke-*/
+local_setup/live-preview/
+**/.sfu/
+**/reports/
+/vendor/
+*.rrd
+*.mp4

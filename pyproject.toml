@@ -45,10 +45,10 @@ test = ["pytest>=8.0"]
 docs = ["mkdocs>=1.6", "mkdocs-material>=9.5"]
 
 [project.urls]
-Homepage = "https://github.com/tomakeIT/PiperPilot"
-Documentation = "https://jialengni.com/PiperPilot/"
-Repository = "https://github.com/tomakeIT/PiperPilot.git"
-Issues = "https://github.com/tomakeIT/PiperPilot/issues"
+Homepage = "https://github.com/prathamv0811/piperpilot-teleop"
+Documentation = "https://github.com/prathamv0811/piperpilot-teleop/tree/main/docs"
+Repository = "https://github.com/prathamv0811/piperpilot-teleop.git"
+Issues = "https://github.com/prathamv0811/piperpilot-teleop/issues"
 
 [project.scripts]
 piper-view = "piper_teleop.apps.view_poses:main"
@@ -65,7 +65,7 @@ piper-finalize = "piper_teleop.tools.finalize_dataset:main"
 piper-convert = "piper_teleop.tools.convert_to_piper_frame:main"
 
 [tool.setuptools.packages.find]
-include = ["piper_teleop*"]
+include = ["piper_teleop*", "local_setup*"]
 
 [tool.setuptools.package-data]
 piper_teleop = ["configs/*.yaml"]
