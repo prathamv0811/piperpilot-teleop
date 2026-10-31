@@ -26,7 +26,7 @@ not needed for anything else.
 
 ```bash
 git clone https://github.com/prathamv0811/piperpilot-teleop.git
-cd PiperPilot
+cd piperpilot-teleop
 ```
 
 ## Python environment

@@ -63,7 +63,7 @@ Dual-arm commands (dual.local.yaml, adapter serials pinned):
   piperpilot camera --camera PATH   stream top UVC to Quest and local Rerun
   piperpilot camera-viewer     serve the local Rerun camera window on port 9090
 
-PiperPilot configured for the standard LEFT PiPER + LEFT Quest 3S controller.
+Single-arm commands use left.local.yaml; configure the actual arm and hand first.
   piperpilot connect       start the headset app and USB forwarding
   piperpilot check         read-only robot feedback + Quest tracking check
   piperpilot view          visualize Quest poses; no robot control
@@ -71,11 +71,11 @@ PiperPilot configured for the standard LEFT PiPER + LEFT Quest 3S controller.
   piperpilot home          MOVE the real arm to its unfolded pose at 10% speed
   piperpilot teleop        enable real-arm teleoperation at the configured speed
   piperpilot stop          quit the active PiperPilot controller process
-  piperpilot test          run upstream tests
+  piperpilot test          run offline project tests
   piperpilot build-apk     rebuild the native headset app
 
-Real teleop: hold LEFT grip to move, trigger controls gripper;
-X toggles recording, Y discards; q quits. See SETUP_LOCAL.md.
+Real Quest teleop: hold the configured hand's grip to move;
+its trigger controls the gripper. See SETUP_LOCAL.md for controls and setup.
 HELP
     ;;
 esac
